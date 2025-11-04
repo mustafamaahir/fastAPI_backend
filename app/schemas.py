@@ -1,7 +1,7 @@
 # app/schemas.py
 # Pydantic schemas for request/response validation.
 
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
 from typing import List, Optional
 
 
@@ -31,5 +31,6 @@ class ForecastItem(BaseModel):
     rainfall: float
 
 
-class ForecastList(BaseModel):
-    __root__: List[ForecastItem]
+class ForecastList(RootModel[List[ForecastItem]]):
+    """Wrapper model for a list of forecast entries"""
+    pass
