@@ -118,10 +118,7 @@ def get_daily_forecast(user_id: int = Query(...), db: Session = Depends(get_db))
         })
 
     return {
-        "status": "success",
-        "forecast_type": "daily",
-        "records": len(formatted_data),
-        "data": formatted_data
+        formatted_data
     }
 
 
@@ -138,8 +135,8 @@ def post_monthly_forecast(items: schemas.ForecastList, db: Session = Depends(get
     if not items_list or not isinstance(items_list, list) or len(items_list) == 0:
         items_list = [
             {"date": "2021-10-10", "rainfall": 14},
-            {"date": "2021-10-11", "rainfall": 7},
-            {"date": "2021-10-12", "rainfall": 20}
+            {"date": "2021-11-11", "rainfall": 7},
+            {"date": "2021-12-12", "rainfall": 20}
         ]
 
     # Optional validation: ensure approximately 3 entries (agent responsibility)
@@ -217,8 +214,5 @@ def get_monthly_forecast(user_id: int = Query(...), db: Session = Depends(get_db
         })
 
     return {
-        "status": "success",
-        "forecast_type": "monthly",
-        "records": len(formatted_data),
-        "data": formatted_data
+        formatted_data
     }
