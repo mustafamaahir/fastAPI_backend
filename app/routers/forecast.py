@@ -67,21 +67,21 @@ def post_daily_forecast(items: schemas.ForecastList, db: Session = Depends(get_d
         "created_at": row.created_at.isoformat()
     }
 
+
 @router.get("/daily_forecast")
 def get_daily_forecast(user_id: int = Query(...), db: Session = Depends(get_db)):
     """
-    Return PNG plot bytes (image/png) for the latest stored daily forecast.
-    - Validates that the requesting user exists (user_id).
-    - Retrieves the most recent Forecast row where forecast_type == 'daily'.
-    - Parses its stored JSON and renders a professionally labeled plot.
-    - Returns image/png only (no JSON data).
+    Return the latest daily forecast as JSON.
+    - Validates user existence.
+    - Retrieves the most recent 'daily' forecast.
+    - Converts dates to day names (Sun–Sat).
     """
-    # Validate user exists (frontend must provide user_id obtained at login)
+    # ✅ Validate user exists
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Get the most recent daily forecast row
+    # ✅ Get the most recent daily forecast
     row = (
         db.query(models.Forecast)
         .filter(models.Forecast.forecast_type == "daily")
@@ -91,26 +91,38 @@ def get_daily_forecast(user_id: int = Query(...), db: Session = Depends(get_db))
     if not row:
         raise HTTPException(status_code=404, detail="No daily forecast available")
 
-    # Parse stored JSON
+    # ✅ Parse stored forecast data
     try:
         data = json.loads(row.forecast_data)
         if not isinstance(data, list) or len(data) == 0:
-            raise ValueError("Parsed forecast_data is empty or not a list")
+            raise ValueError("Forecast data is empty or invalid")
     except Exception:
         raise HTTPException(status_code=500, detail="Stored forecast data is corrupted or invalid")
 
-    # Extract dates and values for plotting
-    try:
-        dates = [str(item.get("date")) for item in data]
-        values = [float(item.get("rainfall")) for item in data]
-    except Exception:
-        raise HTTPException(status_code=500, detail="Forecast items must contain 'date' and numeric 'rainfall'")
+    # ✅ Convert dates → day names (Sun–Sat)
+    formatted_data = []
+    for item in data:
+        date_str = item.get("date")
+        rainfall = item.get("rainfall")
 
-    # Create PNG bytes (plot includes title and axis labels)
-    png_bytes = plot_dates_values_png_bytes(dates, values, title="7-Day Rainfall Forecast")
+        try:
+            date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+            day_name = date_obj.strftime("%a")  # e.g. "Sun", "Mon", "Tue"
+        except Exception:
+            day_name = "InvalidDate"
 
-    # Return image/png only
-    return Response(content=png_bytes, media_type="image/png")
+        formatted_data.append({
+            "day": day_name,
+            "date": date_str,
+            "rainfall": rainfall
+        })
+
+    return {
+        "status": "success",
+        "forecast_type": "daily",
+        "records": len(formatted_data),
+        "data": formatted_data
+    }
 
 
 @router.post("/monthly_forecast")
@@ -158,14 +170,17 @@ def post_monthly_forecast(items: schemas.ForecastList, db: Session = Depends(get
 @router.get("/monthly_forecast")
 def get_monthly_forecast(user_id: int = Query(...), db: Session = Depends(get_db)):
     """
-    Return PNG plot bytes (image/png) for the latest stored monthly forecast.
+    Return the latest monthly forecast as JSON.
     - Validates user_id exists.
-    - Retrieves the most recent monthly forecast row and plots it.
+    - Retrieves the most recent monthly forecast.
+    - Converts dates to month names (e.g. Oct, Nov, Dec).
     """
+    # ✅ Validate user exists
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # ✅ Get the most recent monthly forecast
     row = (
         db.query(models.Forecast)
         .filter(models.Forecast.forecast_type == "monthly")
@@ -175,19 +190,35 @@ def get_monthly_forecast(user_id: int = Query(...), db: Session = Depends(get_db
     if not row:
         raise HTTPException(status_code=404, detail="No monthly forecast available")
 
+    # ✅ Parse stored JSON
     try:
         data = json.loads(row.forecast_data)
         if not isinstance(data, list) or len(data) == 0:
-            raise ValueError("Parsed forecast_data is empty or not a list")
+            raise ValueError("Forecast data is empty or invalid")
     except Exception:
         raise HTTPException(status_code=500, detail="Stored forecast data is corrupted or invalid")
 
-    try:
-        dates = [str(item.get("date")) for item in data]
-        values = [float(item.get("rainfall")) for item in data]
-    except Exception:
-        raise HTTPException(status_code=500, detail="Forecast items must contain 'date' and numeric 'rainfall'")
+    # ✅ Convert date → month abbreviation (Jan–Dec)
+    formatted_data = []
+    for item in data:
+        date_str = item.get("date")
+        rainfall = item.get("rainfall")
 
-    png_bytes = plot_dates_values_png_bytes(dates, values, title="3-Month Rainfall Forecast")
+        try:
+            date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+            month_name = date_obj.strftime("%b")  # e.g. "Oct", "Nov", "Dec"
+        except Exception:
+            month_name = "InvalidDate"
 
-    return Response(content=png_bytes, media_type="image/png")
+        formatted_data.append({
+            "month": month_name,
+            "date": date_str,
+            "rainfall": rainfall
+        })
+
+    return {
+        "status": "success",
+        "forecast_type": "monthly",
+        "records": len(formatted_data),
+        "data": formatted_data
+    }
