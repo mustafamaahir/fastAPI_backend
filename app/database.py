@@ -2,39 +2,35 @@
 # Database initialization and session factory for PostgreSQL (Render) or SQLite (local fallback).
 
 import os
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy import inspect
+import app.models as models  # noqa: F401
 
-# ---- Path Setup ----
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_DIR = os.path.dirname(BASE_DIR)
-DATA_DIR = os.path.join(PROJECT_DIR, "data")
-os.makedirs(DATA_DIR, exist_ok=True)
-
-# ---- Database URL Selection ----
+# ---- Environment Variable ----
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Fallback to local SQLite during local dev
 if not DATABASE_URL:
-    DATABASE_URL = f"sqlite:///{os.path.join(DATA_DIR, 'sail.db')}"
-    connect_args = {"check_same_thread": False}
-else:
-    # Convert Render’s postgres:// URL → postgresql:// (SQLAlchemy format)
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    connect_args = {}
+    raise RuntimeError("❌ DATABASE_URL is not set! Please add it in Render environment settings.")
+
+# Render provides URLs like "postgres://", but SQLAlchemy expects "postgresql://"
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # ---- Engine Setup ----
-engine = create_engine(DATABASE_URL, connect_args=connect_args, echo=False)
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,  # Change to True if you want SQL logs
+)
 
 # ---- Session Setup ----
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
-# ---- Base Class ----
+# ---- Base Class for Models ----
 Base = declarative_base()
 
 def get_db():
-    """Provide a new SQLAlchemy database session."""
+    """Yields a new SQLAlchemy database session."""
     db = SessionLocal()
     try:
         yield db
@@ -42,15 +38,18 @@ def get_db():
         db.close()
 
 def init_db():
-    """Create all database tables in PostgreSQL or SQLite."""
-    from app import models  # ✅ ensure models are imported here
-
+    """Initializes or rebuilds database tables (for Render PostgreSQL)."""
     inspector = inspect(engine)
     tables = inspector.get_table_names()
 
-    if not tables:
-        print("⚙️ No tables detected — creating all tables in database...")
-        Base.metadata.create_all(bind=engine)
-        print("✅ Tables successfully created in database.")
-    else:
-        print(f"✅ Existing tables detected: {tables}")
+    if "users" in tables:
+        columns = [col["name"] for col in inspector.get_columns("users")]
+        if "email" not in columns:
+            print("⚠️ Outdated schema detected — rebuilding database...")
+            Base.metadata.drop_all(bind=engine)
+            Base.metadata.create_all(bind=engine)
+            print("✅ Database successfully rebuilt with latest schema.")
+            return
+
+    Base.metadata.create_all(bind=engine)
+    print("✅ PostgreSQL database initialized successfully.")
