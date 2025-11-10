@@ -2,10 +2,9 @@
 # Database initialization and session factory for PostgreSQL (Render) or SQLite (local fallback).
 
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy import inspect
-import app.models as models  # noqa: F401
+import app as models
 
 # ---- Environment Variable ----
 DATABASE_URL = os.getenv("DATABASE_URL")
