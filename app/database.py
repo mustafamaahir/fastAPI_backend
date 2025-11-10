@@ -4,7 +4,6 @@
 import os
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker, declarative_base
-import app as models
 
 # ---- Environment Variable ----
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -38,6 +37,7 @@ def get_db():
 
 def init_db():
     """Initializes or rebuilds database tables (for Render PostgreSQL)."""
+    from app import models
     inspector = inspect(engine)
     tables = inspector.get_table_names()
 
